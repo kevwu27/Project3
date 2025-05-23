@@ -1,61 +1,57 @@
 using UnityEngine;
 using UnityEngine.AI;
+using static OVRHand;
 
 public class FistTargetTrigger : MonoBehaviour
 {
     public Transform agent;
     public Transform handTarget; // where the hand (left/right) is located
-
-    private bool shouldMove = false;
-    private NavMeshAgent agentNav;
     private Animator agentAnimator;
+
+    public OVRHand hand;
+    private bool previousPinchState = false;
+    private bool isRunning = false;
+    public float runSpeed = 0.1f;
+    private Rigidbody rb;
 
     void Start()
     {
-        agentNav = agent.GetComponent<NavMeshAgent>();
         agentAnimator = agent.GetComponent<Animator>();
-
-        if (agentNav == null)
-        {
-            Debug.LogError("No NavMeshAgent found on agent.");
-        }
+        rb = agent.GetComponent<Rigidbody>();
     }
 
     void Update()
     {
-        if (!shouldMove || agent == null || handTarget == null) return;
+        bool isIndexFingerPinching = hand.GetFingerIsPinching(HandFinger.Middle);
 
-        if (agentAnimator != null)
+        // if (isIndexFingerPinching)
+        // {
+        //     bool isRunning = agentAnimator.GetBool("Run");
+        //     agentAnimator.SetBool("Run", !isRunning);
+        // }
+
+        if (isIndexFingerPinching && !previousPinchState)
         {
-            float speed = agentNav.velocity.magnitude;
-            agentAnimator.SetFloat("speed", speed);
+            isRunning = !isRunning;
+            agentAnimator.SetBool("Run", isRunning);
         }
 
-        if (shouldMove)
+        previousPinchState = isIndexFingerPinching;
+
+        AnimatorStateInfo animState = agentAnimator.GetCurrentAnimatorStateInfo(0);
+        // Move agent forward if running
+        if (isRunning && animState.IsName("Running"))
         {
-            if (agentNav.isOnNavMesh)
-            {
-                agentNav.SetDestination(handTarget.position);
-            }
-        }
-        else
-        {
-            if (!agentNav.pathPending && agentNav.hasPath)
-            {
-                agentNav.ResetPath();
-            }
+            Vector3 moveDirection = agent.forward * runSpeed * Time.deltaTime;
+            rb.MovePosition(rb.position + moveDirection);
         }
     }
 
-    public void StartMovingToHand()
+    void OnCollisionEnter(Collision collision)
     {
-        Debug.Log("Fist recognized: start moving to hand.");
-        shouldMove = true;
-    }
-
-    public void StopMoving()
-    {
-        Debug.Log("Fist released: stop moving.");
-        shouldMove = false;
+        Debug.Log("Collided with " + collision.gameObject.name);
+        // Stop moving or trigger animation change here
+        isRunning = false;
+        agentAnimator.SetBool("Run", false);
     }
 }
